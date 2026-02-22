@@ -1,0 +1,17 @@
+# Core dependencies
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# Web scraping dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# Discovery providers
+# Note: JobSpy requires Python 3.10+ for full functionality
+# If using Python 3.9, only Google Search provider will be available
+python-jobspy>=1.1.79; python_version >= "3.10"
+googlesearch-python>=1.2.0
+
+# Data processing (required by JobSpy)
+pandas>=2.0.0; python_version >= "3.10"
