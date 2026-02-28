@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import sys
 from pathlib import Path
 
@@ -45,26 +45,43 @@ async def list_jobs(
     exclude_deleted: bool = Query(True, description="Exclude deleted jobs"),
     min_score: Optional[int] = Query(None, description="Minimum score filter"),
     max_score: Optional[int] = Query(None, description="Maximum score filter"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    source: Optional[str] = Query(None, description="Filter by source"),
+    status: Optional[str] = Query(None, description="Filter by status (comma-separated for multiple)"),
+    source: Optional[str] = Query(None, description="Filter by source (comma-separated for multiple)"),
+    location: Optional[str] = Query(None, description="Filter by location (comma-separated for multiple)"),
+    remote_type: Optional[str] = Query(None, description="Filter by remote type (comma-separated for multiple)"),
+    sort_by: Optional[str] = Query(None, description="Column to sort by"),
+    sort_desc: bool = Query(True, description="Sort descending"),
     limit: int = Query(100, le=500, description="Max jobs to return"),
     offset: int = Query(0, ge=0, description="Pagination offset")
 ):
     """Get all jobs with optional filters."""
+    # Convert comma-separated strings to lists
+    status_list = [s.strip() for s in status.split(",")] if status else None
+    source_list = [s.strip() for s in source.split(",")] if source else None
+    location_list = [s.strip() for s in location.split(",")] if location else None
+    remote_type_list = [s.strip() for s in remote_type.split(",")] if remote_type else None
+
     jobs = db.get_all_jobs(
         exclude_deleted=exclude_deleted,
         min_score=min_score,
         max_score=max_score,
-        status=status,
-        source=source,
+        status=status_list,
+        source=source_list,
+        location=location_list,
+        remote_type=remote_type_list,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
         limit=limit,
         offset=offset
     )
     total = db.get_jobs_count(
         exclude_deleted=exclude_deleted,
         min_score=min_score,
-        status=status,
-        source=source
+        max_score=max_score,
+        status=status_list,
+        source=source_list,
+        location=location_list,
+        remote_type=remote_type_list
     )
     return {
         "jobs": jobs,

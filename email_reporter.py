@@ -211,12 +211,18 @@ class EmailReporter:
                         <div class="stats-grid">
         """
 
+        prompt_tokens = stats.get('prompt_tokens', 0)
+        completion_tokens = stats.get('completion_tokens', 0)
+        est_cost = (prompt_tokens * 2 + completion_tokens * 8) / 1000000
+
         stats_items = [
             ("Jobs Found", stats.get('jobs_found', 0)),
             ("New Jobs", stats.get('jobs_new', 0)),
             ("Duration", f"{stats.get('duration_seconds', 0):.1f}s"),
             ("API Calls", stats.get('api_calls', 0)),
-            ("Tokens Used", f"{stats.get('tokens_used', 0):,}"),
+            ("Prompt Tokens", f"{prompt_tokens:,}"),
+            ("Completion Tokens", f"{completion_tokens:,}"),
+            ("Est. Cost", f"${est_cost:.4f}"),
         ]
 
         for label, value in stats_items:
@@ -350,6 +356,10 @@ class EmailReporter:
                 ])
 
         # Stats (at the end)
+        prompt_tokens = stats.get('prompt_tokens', 0)
+        completion_tokens = stats.get('completion_tokens', 0)
+        est_cost = (prompt_tokens * 2 + completion_tokens * 8) / 1000000
+
         lines.extend([
             "RUN STATISTICS",
             "-" * 40,
@@ -357,7 +367,9 @@ class EmailReporter:
             f"New Jobs: {stats.get('jobs_new', 0)}",
             f"Duration: {stats.get('duration_seconds', 0):.1f} seconds",
             f"API Calls: {stats.get('api_calls', 0)}",
-            f"Tokens Used: {stats.get('tokens_used', 0):,}",
+            f"Prompt Tokens: {prompt_tokens:,}",
+            f"Completion Tokens: {completion_tokens:,}",
+            f"Est. Cost: ${est_cost:.4f}",
             "",
         ])
 

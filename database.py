@@ -714,8 +714,12 @@ def get_all_jobs(
     exclude_deleted: bool = True,
     min_score: Optional[int] = None,
     max_score: Optional[int] = None,
-    status: Optional[str] = None,
-    source: Optional[str] = None,
+    status: Optional[list[str]] = None,
+    source: Optional[list[str]] = None,
+    location: Optional[list[str]] = None,
+    remote_type: Optional[list[str]] = None,
+    sort_by: Optional[str] = None,
+    sort_desc: bool = True,
     limit: int = 500,
     offset: int = 0
 ) -> list[dict]:
@@ -726,13 +730,102 @@ def get_all_jobs(
         exclude_deleted: If True, exclude jobs with status='deleted'
         min_score: Only include jobs with score >= this value
         max_score: Only include jobs with score <= this value
-        status: Filter by specific status
-        source: Filter by job source (linkedin, web_scraping, etc.)
+        status: Filter by status(es) - list for multi-select
+        source: Filter by source(s) - list for multi-select
+        location: Filter by location(s) - list for multi-select
+        remote_type: Filter by remote type(s) - list for multi-select
+        sort_by: Column to sort by (whitelist validated)
+        sort_desc: Sort descending if True, ascending if False
         limit: Maximum number of jobs to return
         offset: Number of jobs to skip (for pagination)
 
     Returns:
         List of job dictionaries
+    """
+    # Whitelist of allowed sort columns
+    allowed_sort_columns = {'score', 'title', 'company', 'found_date', 'created_at', 'status', 'location', 'source', 'remote_type'}
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+
+        conditions = []
+        params = []
+
+        if exclude_deleted:
+            conditions.append("(status != 'deleted' OR status IS NULL)")
+
+        if min_score is not None:
+            conditions.append("score >= ?")
+            params.append(min_score)
+
+        if max_score is not None:
+            conditions.append("score <= ?")
+            params.append(max_score)
+
+        if status:
+            placeholders = ",".join("?" * len(status))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(status)
+
+        if source:
+            placeholders = ",".join("?" * len(source))
+            conditions.append(f"source IN ({placeholders})")
+            params.extend(source)
+
+        if location:
+            placeholders = ",".join("?" * len(location))
+            conditions.append(f"location IN ({placeholders})")
+            params.extend(location)
+
+        if remote_type:
+            placeholders = ",".join("?" * len(remote_type))
+            conditions.append(f"remote_type IN ({placeholders})")
+            params.extend(remote_type)
+
+        where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+        # Build ORDER BY clause with whitelist validation
+        if sort_by and sort_by in allowed_sort_columns:
+            direction = "DESC" if sort_desc else "ASC"
+            order_clause = f"ORDER BY {sort_by} {direction} NULLS LAST"
+        else:
+            order_clause = "ORDER BY score DESC NULLS LAST, created_at DESC"
+
+        query = f"""
+            SELECT * FROM jobs
+            WHERE {where_clause}
+            {order_clause}
+            LIMIT ? OFFSET ?
+        """
+        params.extend([limit, offset])
+
+        cursor.execute(query, params)
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_jobs_count(
+    exclude_deleted: bool = True,
+    min_score: Optional[int] = None,
+    max_score: Optional[int] = None,
+    status: Optional[list[str]] = None,
+    source: Optional[list[str]] = None,
+    location: Optional[list[str]] = None,
+    remote_type: Optional[list[str]] = None
+) -> int:
+    """
+    Get total count of jobs matching filters (for pagination).
+
+    Args:
+        exclude_deleted: If True, exclude jobs with status='deleted'
+        min_score: Only count jobs with score >= this value
+        max_score: Only count jobs with score <= this value
+        status: Filter by status(es) - list for multi-select
+        source: Filter by source(s) - list for multi-select
+        location: Filter by location(s) - list for multi-select
+        remote_type: Filter by remote type(s) - list for multi-select
+
+    Returns:
+        Total count of matching jobs
     """
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -751,66 +844,25 @@ def get_all_jobs(
             conditions.append("score <= ?")
             params.append(max_score)
 
-        if status is not None:
-            conditions.append("status = ?")
-            params.append(status)
+        if status:
+            placeholders = ",".join("?" * len(status))
+            conditions.append(f"status IN ({placeholders})")
+            params.extend(status)
 
-        if source is not None:
-            conditions.append("source = ?")
-            params.append(source)
+        if source:
+            placeholders = ",".join("?" * len(source))
+            conditions.append(f"source IN ({placeholders})")
+            params.extend(source)
 
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
+        if location:
+            placeholders = ",".join("?" * len(location))
+            conditions.append(f"location IN ({placeholders})")
+            params.extend(location)
 
-        query = f"""
-            SELECT * FROM jobs
-            WHERE {where_clause}
-            ORDER BY score DESC NULLS LAST, created_at DESC
-            LIMIT ? OFFSET ?
-        """
-        params.extend([limit, offset])
-
-        cursor.execute(query, params)
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def get_jobs_count(
-    exclude_deleted: bool = True,
-    min_score: Optional[int] = None,
-    status: Optional[str] = None,
-    source: Optional[str] = None
-) -> int:
-    """
-    Get total count of jobs matching filters (for pagination).
-
-    Args:
-        exclude_deleted: If True, exclude jobs with status='deleted'
-        min_score: Only count jobs with score >= this value
-        status: Filter by specific status
-        source: Filter by job source
-
-    Returns:
-        Total count of matching jobs
-    """
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-
-        conditions = []
-        params = []
-
-        if exclude_deleted:
-            conditions.append("(status != 'deleted' OR status IS NULL)")
-
-        if min_score is not None:
-            conditions.append("score >= ?")
-            params.append(min_score)
-
-        if status is not None:
-            conditions.append("status = ?")
-            params.append(status)
-
-        if source is not None:
-            conditions.append("source = ?")
-            params.append(source)
+        if remote_type:
+            placeholders = ",".join("?" * len(remote_type))
+            conditions.append(f"remote_type IN ({placeholders})")
+            params.extend(remote_type)
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 

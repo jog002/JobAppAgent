@@ -11,6 +11,8 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useQuery } from '@tanstack/react-query';
@@ -82,12 +84,13 @@ export default function Dev() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lines, setLines] = useState(500);
   const [levelFilter, setLevelFilter] = useState<string>('');
+  const [logSource, setLogSource] = useState<'agent' | 'batch'>('agent');
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch logs
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['logs', lines, levelFilter],
-    queryFn: () => getLatestLogs(lines, levelFilter || undefined),
+    queryKey: ['logs', lines, levelFilter, logSource],
+    queryFn: () => getLatestLogs(lines, levelFilter || undefined, logSource),
     refetchInterval: autoRefresh ? 5000 : false,
   });
 
@@ -111,9 +114,23 @@ export default function Dev() {
           flexWrap: 'wrap',
         }}
       >
-        <Typography variant="h6" sx={{ flex: 1 }}>
+        <Typography variant="h6">
           Dev - Logs
         </Typography>
+
+        {/* Log source toggle */}
+        <ToggleButtonGroup
+          value={logSource}
+          exclusive
+          onChange={(_, value) => value && setLogSource(value)}
+          size="small"
+          sx={{ ml: 2 }}
+        >
+          <ToggleButton value="agent">Agent Logs</ToggleButton>
+          <ToggleButton value="batch">Batch Logs</ToggleButton>
+        </ToggleButtonGroup>
+
+        <Box sx={{ flex: 1 }} />
 
         {/* Lines selector */}
         <Select

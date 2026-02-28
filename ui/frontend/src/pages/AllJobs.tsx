@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Alert,
@@ -26,6 +26,12 @@ import { getJobs, updateJobStatus } from '../api/jobs';
 import type { Job, JobStatus } from '../types';
 import { STATUS_LABELS } from '../types';
 
+// Helper to extract filter value by column id
+function getFilterValue<T>(filters: MRT_ColumnFiltersState, id: string): T | undefined {
+  const filter = filters.find(f => f.id === id);
+  return filter?.value as T | undefined;
+}
+
 export default function AllJobs() {
   const queryClient = useQueryClient();
 
@@ -42,14 +48,32 @@ export default function AllJobs() {
     severity: 'success',
   });
 
-  // Fetch jobs
+  // Extract filter values for the API
+  const scoreFilter = getFilterValue<[number, number]>(columnFilters, 'score');
+  const statusFilter = getFilterValue<string[]>(columnFilters, 'status');
+  const sourceFilter = getFilterValue<string[]>(columnFilters, 'source');
+  const remoteTypeFilter = getFilterValue<string[]>(columnFilters, 'remote_type');
+
+  // Reset to page 0 when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [columnFilters]);
+
+  // Fetch jobs with server-side filtering and sorting
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['jobs', showDeleted, pagination.pageIndex, pagination.pageSize],
+    queryKey: ['jobs', showDeleted, pagination, columnFilters, sorting],
     queryFn: () =>
       getJobs({
         excludeDeleted: !showDeleted,
         limit: pagination.pageSize,
         offset: pagination.pageIndex * pagination.pageSize,
+        minScore: scoreFilter?.[0],
+        maxScore: scoreFilter?.[1],
+        status: statusFilter,
+        source: sourceFilter,
+        remoteType: remoteTypeFilter,
+        sortBy: sorting[0]?.id,
+        sortDesc: sorting[0]?.desc ?? true,
       }),
     refetchInterval: 30000,
   });
@@ -140,7 +164,7 @@ export default function AllJobs() {
             size="small"
           />
         ),
-        filterVariant: 'select',
+        filterVariant: 'checkbox',
         filterSelectOptions: [
           { value: 'new', label: 'New' },
           { value: 'reviewed', label: 'Reviewed' },
@@ -175,7 +199,7 @@ export default function AllJobs() {
             />
           );
         },
-        filterVariant: 'multi-select',
+        filterVariant: 'checkbox',
         filterSelectOptions: ['Remote', 'Hybrid', 'On-site', 'Unknown'],
         enableSorting: false,
       },
@@ -196,7 +220,7 @@ export default function AllJobs() {
             />
           );
         },
-        filterVariant: 'multi-select',
+        filterVariant: 'checkbox',
         filterSelectOptions: ['web_scraping', 'linkedin', 'greenhouse', 'indeed', 'glassdoor'],
         enableSorting: false,
       },
@@ -219,8 +243,8 @@ export default function AllJobs() {
     columns,
     data: data?.jobs ?? [],
     manualPagination: true,
-    manualFiltering: false, // Client-side filtering for now
-    manualSorting: false, // Client-side sorting for now
+    manualFiltering: true,
+    manualSorting: true,
     rowCount: data?.total ?? 0,
     state: {
       columnFilters,
@@ -237,11 +261,9 @@ export default function AllJobs() {
     enableDensityToggle: true,
     enableFullScreenToggle: true,
     enableColumnOrdering: true,
-    enableGlobalFilter: true,
-    positionGlobalFilter: 'left',
+    enableGlobalFilter: false, // Disabled - using column filters instead
     initialState: {
       density: 'compact',
-      showGlobalFilter: true,
     },
     muiTableContainerProps: {
       sx: { maxHeight: 'calc(100vh - 240px)' },

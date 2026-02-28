@@ -2,8 +2,8 @@ import { get } from './client';
 import type { LogsResponse, RunsResponse, SearchRun } from '../types';
 
 // Get latest logs
-export async function getLatestLogs(lines = 500, level?: string): Promise<LogsResponse> {
-  const params = new URLSearchParams({ lines: String(lines) });
+export async function getLatestLogs(lines = 500, level?: string, source: 'agent' | 'batch' = 'agent'): Promise<LogsResponse> {
+  const params = new URLSearchParams({ lines: String(lines), source });
   if (level) {
     params.append('level', level);
   }

@@ -1,11 +1,14 @@
 import { get, patch } from './client';
 import type { Job, JobsResponse, SuggestedJobsResponse, JobStatsResponse, JobStatus } from '../types';
 
-// Query params builder
-function buildQueryString(params: Record<string, string | number | boolean | undefined>): string {
+// Query params builder - handles arrays by joining with commas
+function buildQueryString(params: Record<string, string | string[] | number | boolean | undefined>): string {
   const filtered = Object.entries(params)
-    .filter(([, value]) => value !== undefined)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+    .filter(([, value]) => value !== undefined && value !== null && (Array.isArray(value) ? value.length > 0 : true))
+    .map(([key, value]) => {
+      const stringValue = Array.isArray(value) ? value.join(',') : String(value);
+      return `${encodeURIComponent(key)}=${encodeURIComponent(stringValue)}`;
+    });
 
   return filtered.length > 0 ? `?${filtered.join('&')}` : '';
 }
@@ -15,8 +18,12 @@ export async function getJobs(params: {
   excludeDeleted?: boolean;
   minScore?: number;
   maxScore?: number;
-  status?: string;
-  source?: string;
+  status?: string[];
+  source?: string[];
+  location?: string[];
+  remoteType?: string[];
+  sortBy?: string;
+  sortDesc?: boolean;
   limit?: number;
   offset?: number;
 } = {}): Promise<JobsResponse> {
@@ -26,6 +33,10 @@ export async function getJobs(params: {
     max_score: params.maxScore,
     status: params.status,
     source: params.source,
+    location: params.location,
+    remote_type: params.remoteType,
+    sort_by: params.sortBy,
+    sort_desc: params.sortDesc,
     limit: params.limit,
     offset: params.offset,
   });

@@ -15,10 +15,15 @@ router = APIRouter()
 @router.get("/latest")
 async def get_latest_logs(
     lines: int = Query(500, le=5000, description="Number of lines to return"),
-    level: str = Query(None, description="Filter by log level (INFO, WARNING, ERROR)")
+    level: str = Query(None, description="Filter by log level (INFO, WARNING, ERROR)"),
+    source: str = Query("agent", description="Log source: 'agent' or 'batch'")
 ):
     """Get the latest log entries from the log file."""
-    log_path = Path(LOG_FILE) if LOG_FILE else LOGS_DIR / "job_agent.log"
+    # Determine which log file to read based on source
+    if source == "batch":
+        log_path = LOGS_DIR / "batch_agent.log"
+    else:
+        log_path = Path(LOG_FILE) if LOG_FILE else LOGS_DIR / "job_agent.log"
 
     if not log_path.exists():
         return {
