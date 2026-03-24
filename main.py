@@ -8,10 +8,10 @@ from datetime import datetime
 from pathlib import Path
 
 # Handle batch mode env file loading BEFORE importing config
-# This ensures .batch_env is loaded before config evaluates its values
+# This ensures batch.env is loaded before config evaluates its values
 if '--batch' in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == 'batch'):
     from dotenv import load_dotenv
-    batch_env_path = Path(__file__).parent / ".batch_env"
+    batch_env_path = Path(__file__).parent / "batch.env"
     if batch_env_path.exists():
         load_dotenv(batch_env_path, override=True)
         print(f"[Batch Mode] Loaded config from {batch_env_path}")
@@ -20,6 +20,11 @@ if '--batch' in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == 'batch'):
         load_dotenv(override=True)
 
 import config
+from config import (
+    LLM_PROVIDER,
+    CLAUDE_INPUT_COST_PER_M, CLAUDE_OUTPUT_COST_PER_M,
+    OPENAI_INPUT_COST_PER_M, OPENAI_OUTPUT_COST_PER_M
+)
 import database as db
 import scoring_engine
 from email_reporter import create_email_reporter_from_config
@@ -333,8 +338,10 @@ def generate_console_report(results: dict) -> None:
         print(f"• Prompt Tokens: {stats['prompt_tokens']:,}")
         print(f"• Completion Tokens: {stats['completion_tokens']:,}")
         print(f"• API Calls: {stats['api_calls']}")
-        # Estimate cost (GPT-4.1 pricing: ~$0.03/1K input, ~$0.06/1K output)
-        est_cost = (stats['prompt_tokens'] * 2 + stats['completion_tokens'] * 8) / 1000000
+        if LLM_PROVIDER == "claude":
+            est_cost = (stats['prompt_tokens'] * CLAUDE_INPUT_COST_PER_M + stats['completion_tokens'] * CLAUDE_OUTPUT_COST_PER_M) / 1000000
+        else:
+            est_cost = (stats['prompt_tokens'] * OPENAI_INPUT_COST_PER_M + stats['completion_tokens'] * OPENAI_OUTPUT_COST_PER_M) / 1000000
         print(f"• Estimated Cost: ${est_cost:.4f}")
     print()
 
@@ -528,7 +535,10 @@ def generate_rerank_report(results: dict) -> None:
         print(f"• Prompt Tokens: {stats['prompt_tokens']:,}")
         print(f"• Completion Tokens: {stats['completion_tokens']:,}")
         print(f"• API Calls: {stats['api_calls']}")
-        est_cost = (stats['prompt_tokens'] * 0.03 + stats['completion_tokens'] * 0.06) / 1000
+        if LLM_PROVIDER == "claude":
+            est_cost = (stats['prompt_tokens'] * CLAUDE_INPUT_COST_PER_M + stats['completion_tokens'] * CLAUDE_OUTPUT_COST_PER_M) / 1000000
+        else:
+            est_cost = (stats['prompt_tokens'] * OPENAI_INPUT_COST_PER_M + stats['completion_tokens'] * OPENAI_OUTPUT_COST_PER_M) / 1000000
         print(f"• Estimated Cost: ${est_cost:.4f}")
         print()
 
@@ -570,11 +580,11 @@ def generate_rerank_report(results: dict) -> None:
 
 def run_batch_job() -> dict:
     """
-    Run a batch job using .batch_env configuration.
+    Run a batch job using batch.env configuration.
 
     This is designed to be called by automated schedulers (launchd, cron).
     It runs the standard job search but:
-    - Uses .batch_env for configuration (loaded at startup)
+    - Uses batch.env for configuration (loaded at startup)
     - Logs to batch-specific log files
     - Returns appropriate exit codes for automation
 
@@ -583,7 +593,7 @@ def run_batch_job() -> dict:
     """
     logger.info("=" * 80)
     logger.info("Starting BATCH Job Search")
-    logger.info(f"Using config from .batch_env")
+    logger.info(f"Using config from batch.env")
     logger.info("=" * 80)
 
     # Run the standard job search
@@ -623,13 +633,13 @@ def main():
 Commands:
   (default)   Run job search and score new jobs
   rerank      Rescore existing jobs with current scoring criteria
-  batch       Run job search using .batch_env config (for scheduled automation)
+  batch       Run job search using batch.env config (for scheduled automation)
 
 Examples:
   python main.py              # Run normal job search
   python main.py rerank       # Rescore all jobs in database
   python main.py rerank --min-score 60 --limit 50  # Rescore top 50 jobs with score >= 60
-  python main.py batch        # Run batch job with .batch_env config
+  python main.py batch        # Run batch job with batch.env config
         """
     )
 
@@ -672,7 +682,7 @@ Examples:
             # Reset token usage at start of run
             scoring_engine.reset_token_usage()
 
-            # Run batch job (uses .batch_env loaded at startup)
+            # Run batch job (uses batch.env loaded at startup)
             results = run_batch_job()
 
         else:
