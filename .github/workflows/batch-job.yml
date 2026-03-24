@@ -26,85 +26,85 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create .batch_env from secrets
+      - name: Create batch.env from secrets
         run: |
-          cat << 'EOF' > .batch_env
-          # LLM Provider Selection
-          LLM_PROVIDER=claude
+          cat << 'EOF' > batch.env
+# LLM Provider Selection
+LLM_PROVIDER=claude
 
-          # OpenAI API Configuration
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL=gpt-4.1
-          OPENAI_TEMPERATURE=0.3
-          OPENAI_MAX_TOKENS=2000
-          OPENAI_INPUT_COST_PER_M=2.0
-          OPENAI_OUTPUT_COST_PER_M=8.0
+# OpenAI API Configuration
+OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+OPENAI_MODEL=gpt-4.1
+OPENAI_TEMPERATURE=0.3
+OPENAI_MAX_TOKENS=2000
+OPENAI_INPUT_COST_PER_M=2.0
+OPENAI_OUTPUT_COST_PER_M=8.0
 
-          # Claude API Configuration
-          CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
-          CLAUDE_MODEL=claude-sonnet-4-20250514
-          CLAUDE_TEMPERATURE=0.3
-          CLAUDE_MAX_TOKENS=2000
-          CLAUDE_INPUT_COST_PER_M=3.0
-          CLAUDE_OUTPUT_COST_PER_M=15.0
+# Claude API Configuration
+CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
+CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_TEMPERATURE=0.3
+CLAUDE_MAX_TOKENS=2000
+CLAUDE_INPUT_COST_PER_M=3.0
+CLAUDE_OUTPUT_COST_PER_M=15.0
 
-          # Database Configuration
-          DATABASE_PATH=./data/jobs.db
+# Database Configuration
+DATABASE_PATH=./data/jobs.db
 
-          # Logging Configuration
-          LOG_LEVEL=INFO
-          LOG_FILE=./logs/batch_agent.log
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_FILE=./logs/batch_agent.log
 
-          # Search Configuration
-          SEARCH_KEYWORDS=software engineer
-          SEARCH_LOCATIONS=Remote,New York
-          MAX_RESULTS_PER_SEARCH=50
+# Search Configuration
+SEARCH_KEYWORDS=software engineer
+SEARCH_LOCATIONS=Remote,New York
+MAX_RESULTS_PER_SEARCH=50
 
-          # Scoring Configuration
-          MIN_DISPLAY_SCORE=60
-          TOP_JOBS_LIMIT=20
+# Scoring Configuration
+MIN_DISPLAY_SCORE=60
+TOP_JOBS_LIMIT=20
 
-          # Job Sources Configuration
-          ENABLED_SOURCES=web_scraping
+# Job Sources Configuration
+ENABLED_SOURCES=web_scraping
 
-          # Web Scraping Configuration
-          WEB_SCRAPING_PLATFORMS=greenhouse,lever,bamboohr,ashby
-          SCRAPING_DELAY_SECONDS=2.0
+# Web Scraping Configuration
+WEB_SCRAPING_PLATFORMS=greenhouse,lever,bamboohr,ashby
+SCRAPING_DELAY_SECONDS=2.0
 
-          # Discovery Provider Configuration
-          ENABLED_DISCOVERY_PROVIDERS=jobspy,brave_search,serpapi
+# Discovery Provider Configuration
+ENABLED_DISCOVERY_PROVIDERS=jobspy,brave_search,serpapi
 
-          # Brave Search API Configuration
-          BRAVE_API_KEY=${{ secrets.BRAVE_API_KEY }}
-          BRAVE_SEARCH_FRESHNESS=day
+# Brave Search API Configuration
+BRAVE_API_KEY=${{ secrets.BRAVE_API_KEY }}
+BRAVE_SEARCH_FRESHNESS=day
 
-          # JobSpy Configuration
-          JOBSPY_SITES=glassdoor,indeed
-          JOBSPY_HOURS_OLD=24
+# JobSpy Configuration
+JOBSPY_SITES=glassdoor,indeed
+JOBSPY_HOURS_OLD=24
 
-          # Location Terms
-          LOCATION_TERMS=NY,New York,Remote,NYC,Jersey City
+# Location Terms
+LOCATION_TERMS=NY,New York,Remote,NYC,Jersey City
 
-          # Search Mode Configuration
-          SEARCH_MODE=combined
-          LEVEL_TERMS=Software Engineer II,Software Engineer 2,SWE II,SWE 2,Software Developer II,Software Developer 2,Associate Software Engineer
+# Search Mode Configuration
+SEARCH_MODE=combined
+LEVEL_TERMS=Software Engineer II,Software Engineer 2,SWE II,SWE 2,Software Developer II,Software Developer 2,Associate Software Engineer
 
-          # SerpAPI Configuration
-          SERPAPI_API_KEY=${{ secrets.SERPAPI_API_KEY }}
-          SERPAPI_PAGES=5
-          SERPAPI_RECENCY=day
-          SERPAPI_TARGET_SITE=greenhouse.io
-          SERPAPI_START_PAGE=0
+# SerpAPI Configuration
+SERPAPI_API_KEY=${{ secrets.SERPAPI_API_KEY }}
+SERPAPI_PAGES=5
+SERPAPI_RECENCY=day
+SERPAPI_TARGET_SITE=greenhouse.io
+SERPAPI_START_PAGE=0
 
-          # Email Reporting Configuration
-          EMAIL_ENABLED=true
-          EMAIL_RECIPIENT=${{ secrets.EMAIL_RECIPIENT }}
-          SMTP_SERVER=smtp.gmail.com
-          SMTP_PORT=587
-          SMTP_SENDER_EMAIL=${{ secrets.SMTP_SENDER_EMAIL }}
-          SMTP_SENDER_PASSWORD=${{ secrets.SMTP_SENDER_PASSWORD }}
-          SMTP_USE_TLS=true
-          EOF
+# Email Reporting Configuration
+EMAIL_ENABLED=true
+EMAIL_RECIPIENT=${{ secrets.EMAIL_RECIPIENT }}
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SENDER_EMAIL=${{ secrets.SMTP_SENDER_EMAIL }}
+SMTP_SENDER_PASSWORD=${{ secrets.SMTP_SENDER_PASSWORD }}
+SMTP_USE_TLS=true
+EOF
 
       - name: Create required directories
         run: |
