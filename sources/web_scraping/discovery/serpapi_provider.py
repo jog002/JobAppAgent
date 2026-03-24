@@ -111,6 +111,7 @@ class SerpAPIProvider(BaseDiscoveryProvider):
         max_results: int = 50,
         recency: Optional[str] = None,
         max_pages: int = 3,
+        start_page: int = 0,
         max_retries: int = 3,
         base_delay: float = 1.0,
         # Legacy parameters (ignored, kept for backward compatibility)
@@ -142,6 +143,8 @@ class SerpAPIProvider(BaseDiscoveryProvider):
             max_pages: Maximum number of pagination requests (each returns 10 results).
                 Defaults to 3 (30 results). Max 10 (100 results).
                 Each page uses 1 API credit.
+            start_page: Starting page number for pagination (0-indexed).
+                Defaults to 0. Set higher for deeper searches on subsequent runs.
             max_retries: Maximum retry attempts for transient failures.
             base_delay: Base delay in seconds for exponential backoff.
             platforms: LEGACY - ignored (always searches target_site)
@@ -155,6 +158,7 @@ class SerpAPIProvider(BaseDiscoveryProvider):
         self.target_site = target_site
         self.max_results = min(max_results, 100)  # SerpAPI max is 100
         self.max_pages = min(max(max_pages, 1), 10)  # 1-10 pages
+        self.start_page = max(start_page, 0)  # Ensure non-negative
         self.recency = self.RECENCY_OPTIONS.get(recency, None)
         self.max_retries = max_retries
         self.base_delay = base_delay
@@ -354,12 +358,13 @@ class SerpAPIProvider(BaseDiscoveryProvider):
         # Calculate pages needed, but cap at max_pages
         pages_needed = min((num_results + 9) // 10, self.max_pages)
 
+        end_page = self.start_page + pages_needed
         logger.debug(
-            f"SerpAPI: Fetching {pages_needed} pages "
-            f"(up to {pages_needed * 10} results)"
+            f"SerpAPI: Fetching pages {self.start_page}-{end_page - 1} "
+            f"({pages_needed} pages, up to {pages_needed * 10} results)"
         )
 
-        for page in range(pages_needed):
+        for page in range(self.start_page, end_page):
             start_index = page * 10
 
             urls = self._fetch_page(query, start_index, recency)
@@ -373,13 +378,13 @@ class SerpAPIProvider(BaseDiscoveryProvider):
             # If we got fewer than 10 results, no more pages available
             if len(urls) < 10:
                 logger.debug(
-                    f"SerpAPI: Page {page + 1} returned {len(urls)} results, "
+                    f"SerpAPI: Page {page} returned {len(urls)} results, "
                     f"stopping pagination"
                 )
                 break
 
             # Small delay between pages to be nice to the API
-            if page < pages_needed - 1:
+            if page < end_page - 1:
                 time.sleep(0.5)
 
         logger.debug(f"SerpAPI: Collected {len(all_urls)} total URLs")

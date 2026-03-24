@@ -8,6 +8,12 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional
 
+from config import (
+    LLM_PROVIDER,
+    CLAUDE_INPUT_COST_PER_M, CLAUDE_OUTPUT_COST_PER_M,
+    OPENAI_INPUT_COST_PER_M, OPENAI_OUTPUT_COST_PER_M
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -213,7 +219,10 @@ class EmailReporter:
 
         prompt_tokens = stats.get('prompt_tokens', 0)
         completion_tokens = stats.get('completion_tokens', 0)
-        est_cost = (prompt_tokens * 2 + completion_tokens * 8) / 1000000
+        if LLM_PROVIDER == "claude":
+            est_cost = (prompt_tokens * CLAUDE_INPUT_COST_PER_M + completion_tokens * CLAUDE_OUTPUT_COST_PER_M) / 1000000
+        else:
+            est_cost = (prompt_tokens * OPENAI_INPUT_COST_PER_M + completion_tokens * OPENAI_OUTPUT_COST_PER_M) / 1000000
 
         stats_items = [
             ("Jobs Found", stats.get('jobs_found', 0)),
@@ -358,7 +367,10 @@ class EmailReporter:
         # Stats (at the end)
         prompt_tokens = stats.get('prompt_tokens', 0)
         completion_tokens = stats.get('completion_tokens', 0)
-        est_cost = (prompt_tokens * 2 + completion_tokens * 8) / 1000000
+        if LLM_PROVIDER == "claude":
+            est_cost = (prompt_tokens * CLAUDE_INPUT_COST_PER_M + completion_tokens * CLAUDE_OUTPUT_COST_PER_M) / 1000000
+        else:
+            est_cost = (prompt_tokens * OPENAI_INPUT_COST_PER_M + completion_tokens * OPENAI_OUTPUT_COST_PER_M) / 1000000
 
         lines.extend([
             "RUN STATISTICS",

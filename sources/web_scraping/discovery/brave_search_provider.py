@@ -217,13 +217,15 @@ class BraveSearchProvider(BaseDiscoveryProvider):
 
         Constructs a single query based on search_mode:
         - 'default': site:greenhouse.io inpage:"keywords"
-        - 'mid_level': site:greenhouse.io (inpage:"SWE II" OR inpage:"SWE 2" ...)
+        - 'mid_level': site:greenhouse.io AND inpage:"SWE II" OR inpage:"SWE 2" ...
         - 'exclude_senior': site:greenhouse.io inpage:"keywords" -Senior -Staff
-        - 'combined': site:greenhouse.io (inpage:"SWE II" OR ...) -Senior -Staff
+        - 'combined': site:greenhouse.io AND inpage:"SWE II" OR ... -Senior -Staff
+
+        Note: Brave API breaks with parentheses, so we use AND before first term instead.
 
         Example output (combined mode):
-            site:greenhouse.io (inpage:"Software Engineer II" OR inpage:"Software Engineer 2"
-            OR inpage:"SWE II" OR inpage:"SWE 2") -Senior -Staff -Principal -Lead
+            site:greenhouse.io AND inpage:"Software Engineer II" OR inpage:"Software Engineer 2"
+            OR inpage:"SWE II" OR inpage:"SWE 2" -Senior -Staff -Principal -Lead
 
         Args:
             keywords: Job keywords (used in default/exclude_senior modes only)
@@ -236,9 +238,10 @@ class BraveSearchProvider(BaseDiscoveryProvider):
         # Build search terms based on mode
         if self.search_mode in ('mid_level', 'combined'):
             # Build OR group for level II terms with inpage:
+            # Note: Brave API breaks with parentheses, use AND before first term instead
             if self.level_terms:
                 level_group = ' OR '.join(f'inpage:"{term}"' for term in self.level_terms)
-                parts.append(f'({level_group})')
+                parts.append(f'AND {level_group}')
             elif keywords:
                 # Fallback to keywords if no level terms
                 parts.append(f'inpage:"{keywords}"')

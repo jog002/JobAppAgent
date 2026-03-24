@@ -94,6 +94,10 @@ except ValueError as e:
 # Options: hour, day, week, month, year, or empty for all results
 SERPAPI_RECENCY = os.getenv("SERPAPI_RECENCY", "") or None
 
+# SerpAPI start page (for deeper searches on subsequent runs)
+# Page 0 = results 1-10, Page 1 = results 11-20, etc.
+SERPAPI_START_PAGE = int(os.getenv("SERPAPI_START_PAGE", "0"))
+
 # SerpAPI target site (default: greenhouse.io)
 SERPAPI_TARGET_SITE = os.getenv("SERPAPI_TARGET_SITE", "greenhouse.io")
 
@@ -158,12 +162,15 @@ EXCLUDE_LEVELS = [
     t.strip() for t in _exclude_levels_raw.split(",") if t.strip()
 ] or None  # None means use defaults
 
+# LLM API Provider Selection
+# Options: "claude" or "openai"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "claude").lower()
+if LLM_PROVIDER not in ("claude", "openai"):
+    raise ValueError("LLM_PROVIDER must be 'claude' or 'openai'")
+
 # OpenAI API Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable is required")
-
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")  # Default to gpt-4o
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 try:
     OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.3"))
@@ -178,6 +185,52 @@ try:
         raise ValueError("OPENAI_MAX_TOKENS must be positive")
 except ValueError as e:
     raise ValueError(f"Invalid OPENAI_MAX_TOKENS: {e}")
+
+# OpenAI cost per million tokens (for reporting)
+try:
+    OPENAI_INPUT_COST_PER_M = float(os.getenv("OPENAI_INPUT_COST_PER_M", "2.0"))
+except ValueError as e:
+    raise ValueError(f"Invalid OPENAI_INPUT_COST_PER_M: {e}")
+
+try:
+    OPENAI_OUTPUT_COST_PER_M = float(os.getenv("OPENAI_OUTPUT_COST_PER_M", "8.0"))
+except ValueError as e:
+    raise ValueError(f"Invalid OPENAI_OUTPUT_COST_PER_M: {e}")
+
+# Claude API Configuration
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+
+try:
+    CLAUDE_TEMPERATURE = float(os.getenv("CLAUDE_TEMPERATURE", "0.3"))
+    if not 0 <= CLAUDE_TEMPERATURE <= 1:
+        raise ValueError("CLAUDE_TEMPERATURE must be between 0 and 1")
+except ValueError as e:
+    raise ValueError(f"Invalid CLAUDE_TEMPERATURE: {e}")
+
+try:
+    CLAUDE_MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "1000"))
+    if CLAUDE_MAX_TOKENS < 1:
+        raise ValueError("CLAUDE_MAX_TOKENS must be positive")
+except ValueError as e:
+    raise ValueError(f"Invalid CLAUDE_MAX_TOKENS: {e}")
+
+# Claude cost per million tokens (for reporting)
+try:
+    CLAUDE_INPUT_COST_PER_M = float(os.getenv("CLAUDE_INPUT_COST_PER_M", "3.0"))
+except ValueError as e:
+    raise ValueError(f"Invalid CLAUDE_INPUT_COST_PER_M: {e}")
+
+try:
+    CLAUDE_OUTPUT_COST_PER_M = float(os.getenv("CLAUDE_OUTPUT_COST_PER_M", "15.0"))
+except ValueError as e:
+    raise ValueError(f"Invalid CLAUDE_OUTPUT_COST_PER_M: {e}")
+
+# Validate that the selected provider has an API key
+if LLM_PROVIDER == "claude" and not CLAUDE_API_KEY:
+    raise ValueError("CLAUDE_API_KEY is required when LLM_PROVIDER=claude")
+if LLM_PROVIDER == "openai" and not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
 
 # Database Configuration
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_DIR / "jobs.db"))
