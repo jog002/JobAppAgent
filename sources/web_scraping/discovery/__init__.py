@@ -267,6 +267,12 @@ try:
 except ImportError:
     SerpAPIProvider = None  # requests not installed (unlikely)
 
+try:
+    from .greenhouse_api_provider import GreenhouseAPIProvider, extract_greenhouse_token
+except ImportError:
+    GreenhouseAPIProvider = None
+    extract_greenhouse_token = None
+
 
 __all__ = [
     'BaseDiscoveryProvider',
@@ -276,5 +282,7 @@ __all__ = [
     'GoogleSearchProvider',
     'BraveSearchProvider',
     'SerpAPIProvider',
+    'GreenhouseAPIProvider',
+    'extract_greenhouse_token',
     'FilterFunc',
 ]

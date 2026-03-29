@@ -232,6 +232,27 @@ class WebScrapingSource(BaseJobSource):
                     f"SerpAPI provider not available: {e}"
                 )
 
+        # Add Greenhouse API provider (direct API polling)
+        if 'greenhouse_api' in enabled_providers:
+            try:
+                from .discovery.greenhouse_api_provider import GreenhouseAPIProvider
+                greenhouse_enabled = os.getenv('GREENHOUSE_API_ENABLED', 'true').lower() == 'true'
+                use_curated = os.getenv('GREENHOUSE_POLL_CURATED', 'true').lower() == 'true'
+
+                if greenhouse_enabled:
+                    manager.add_provider(GreenhouseAPIProvider(
+                        use_curated=use_curated
+                    ))
+                    logger.info(
+                        f"Added Greenhouse API provider (curated={use_curated})"
+                    )
+                else:
+                    logger.info("Greenhouse API provider disabled via GREENHOUSE_API_ENABLED")
+            except ImportError as e:
+                logger.warning(
+                    f"Greenhouse API provider not available: {e}"
+                )
+
         # Add location filter if specified
         if location_filter:
             from .discovery.filters import create_location_filter

@@ -8,7 +8,19 @@ from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import contextmanager
 
-from config import DATABASE_PATH
+from config import DATABASE_PATH, DATABASE_MODE, TURSO_DATABASE_URL, TURSO_AUTH_TOKEN
+
+# Initialize connection type based on DATABASE_MODE config
+_use_turso = DATABASE_MODE == "turso"
+_libsql = None
+
+if _use_turso:
+    try:
+        import libsql_experimental as libsql
+        _libsql = libsql
+    except ImportError:
+        logging.warning("libsql_experimental not installed, falling back to local SQLite")
+        _use_turso = False
 
 logger = logging.getLogger(__name__)
 
@@ -197,13 +209,120 @@ CREATE TABLE IF NOT EXISTS search_runs (
     error_message TEXT,
     duration_seconds REAL
 );
+
+CREATE TABLE IF NOT EXISTS greenhouse_tokens (
+    token TEXT PRIMARY KEY,
+    company_name TEXT,
+    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_polled TIMESTAMP,
+    job_count INTEGER DEFAULT 0,
+    source TEXT DEFAULT 'curated'
+);
+
+CREATE INDEX IF NOT EXISTS idx_greenhouse_tokens_source ON greenhouse_tokens(source);
 """
+
+class TursoRowWrapper:
+    """Wrapper to make libsql rows behave like sqlite3.Row."""
+
+    def __init__(self, row, description):
+        self._row = row
+        self._keys = [col[0] for col in description] if description else []
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._row[key]
+        if isinstance(key, str):
+            try:
+                idx = self._keys.index(key)
+                return self._row[idx]
+            except ValueError:
+                raise KeyError(key)
+        raise TypeError(f"Invalid key type: {type(key)}")
+
+    def keys(self):
+        return self._keys
+
+
+class TursoCursorWrapper:
+    """Wrapper to make libsql cursor return dict-compatible rows."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self._description = None
+
+    def execute(self, sql, params=None):
+        if params:
+            result = self._cursor.execute(sql, params)
+        else:
+            result = self._cursor.execute(sql)
+        self._description = self._cursor.description
+        return result
+
+    def executescript(self, sql):
+        return self._cursor.executescript(sql)
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        if row is None:
+            return None
+        return TursoRowWrapper(row, self._description)
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        return [TursoRowWrapper(row, self._description) for row in rows]
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+
+class TursoConnectionWrapper:
+    """Wrapper to make libsql connection compatible with sqlite3 API."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return TursoCursorWrapper(self._conn.cursor())
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    def executescript(self, sql):
+        return self._conn.executescript(sql)
+
 
 @contextmanager
 def get_db_connection():
-    """Context manager for database connections."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
+    """Context manager for database connections.
+
+    Uses Turso (libsql) if DATABASE_MODE=turso, otherwise local SQLite.
+    Returns a connection with consistent API regardless of backend.
+    """
+    if _use_turso and _libsql:
+        raw_conn = _libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        conn = TursoConnectionWrapper(raw_conn)
+        logger.debug("Connected to Turso cloud database")
+    else:
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        logger.debug(f"Connected to local SQLite: {DATABASE_PATH}")
+
     try:
         yield conn
         conn.commit()
@@ -217,7 +336,10 @@ def get_db_connection():
 
 def init_database():
     """Initialize database with schema."""
-    logger.info(f"Initializing database at {DATABASE_PATH}")
+    if _use_turso:
+        logger.info("Initializing Turso cloud database")
+    else:
+        logger.info(f"Initializing database at {DATABASE_PATH}")
     with get_db_connection() as conn:
         conn.executescript(SCHEMA)
     logger.info("Database initialized successfully")
@@ -939,3 +1061,100 @@ def get_latest_run() -> Optional[dict]:
         """)
         row = cursor.fetchone()
         return dict(row) if row else None
+
+
+# Greenhouse token management functions
+
+def get_greenhouse_tokens(source: Optional[str] = None) -> list[dict]:
+    """
+    Get all stored Greenhouse company tokens.
+
+    Args:
+        source: Filter by source ('curated' or 'discovered'), or None for all
+
+    Returns:
+        List of token dictionaries
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if source:
+            cursor.execute(
+                "SELECT * FROM greenhouse_tokens WHERE source = ? ORDER BY token",
+                (source,)
+            )
+        else:
+            cursor.execute("SELECT * FROM greenhouse_tokens ORDER BY token")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def add_greenhouse_token(
+    token: str,
+    company_name: Optional[str] = None,
+    source: str = "discovered"
+) -> bool:
+    """
+    Add a new Greenhouse company token.
+
+    Args:
+        token: The company board token (e.g., 'anthropic')
+        company_name: Human-readable company name
+        source: How it was found ('curated' or 'discovered')
+
+    Returns:
+        True if token was added, False if already exists
+    """
+    token = token.lower().strip()
+    if not token:
+        return False
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO greenhouse_tokens (token, company_name, source)
+                VALUES (?, ?, ?)
+            """, (token, company_name, source))
+            logger.info(f"Added Greenhouse token: {token} (source: {source})")
+            return True
+        except Exception:
+            # Token already exists
+            return False
+
+
+def update_greenhouse_token_stats(token: str, job_count: int) -> None:
+    """
+    Update statistics for a Greenhouse token after polling.
+
+    Args:
+        token: The company board token
+        job_count: Number of jobs found
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE greenhouse_tokens
+            SET last_polled = ?, job_count = ?
+            WHERE token = ?
+        """, (datetime.now().isoformat(), job_count, token.lower()))
+
+
+def get_greenhouse_token_stats() -> dict:
+    """
+    Get statistics about stored Greenhouse tokens.
+
+    Returns:
+        Dictionary with token statistics
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total_tokens,
+                COUNT(CASE WHEN source = 'curated' THEN 1 END) as curated,
+                COUNT(CASE WHEN source = 'discovered' THEN 1 END) as discovered,
+                SUM(job_count) as total_jobs,
+                COUNT(CASE WHEN last_polled IS NOT NULL THEN 1 END) as polled_tokens
+            FROM greenhouse_tokens
+        """)
+        row = cursor.fetchone()
+        return dict(row) if row else {}

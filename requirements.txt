@@ -16,3 +16,6 @@ googlesearch-python>=1.2.0
 
 # Data processing (required by JobSpy)
 pandas>=2.0.0; python_version >= "3.10"
+
+# Cloud database (Turso - SQLite compatible)
+libsql-experimental>=0.0.47

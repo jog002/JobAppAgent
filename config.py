@@ -233,7 +233,29 @@ if LLM_PROVIDER == "openai" and not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
 
 # Database Configuration
+# DATABASE_MODE: "local" (SQLite file) or "turso" (cloud database)
+DATABASE_MODE = os.getenv("DATABASE_MODE", "local").lower()
+if DATABASE_MODE not in ("local", "turso"):
+    raise ValueError("DATABASE_MODE must be 'local' or 'turso'")
+
+# Local SQLite database path (used when DATABASE_MODE=local)
 DATABASE_PATH = os.getenv("DATABASE_PATH", str(DATA_DIR / "jobs.db"))
+
+# Turso Cloud Database Configuration (used when DATABASE_MODE=turso)
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+# Validate Turso config if mode is turso
+if DATABASE_MODE == "turso":
+    if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+        raise ValueError(
+            "DATABASE_MODE=turso requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN to be set"
+        )
+
+# Greenhouse API Configuration
+# Direct API polling for known company boards
+GREENHOUSE_API_ENABLED = os.getenv("GREENHOUSE_API_ENABLED", "true").lower() == "true"
+GREENHOUSE_POLL_CURATED = os.getenv("GREENHOUSE_POLL_CURATED", "true").lower() == "true"
 
 # Logging Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
