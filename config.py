@@ -1,5 +1,6 @@
 """Configuration management for Multi-Source Job Agent."""
 
+import logging
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -40,12 +41,6 @@ RESUME_DIR.mkdir(exist_ok=True)
 LINKEDIN_COOKIE = os.getenv("LINKEDIN_COOKIE")
 LINKEDIN_SESSION_PATH = os.getenv("LINKEDIN_SESSION_PATH", str(Path.home() / ".linkedin-mcp" / "session.json"))
 
-# Legacy Configuration (no longer used)
-# Kept for backward compatibility
-COMPANY_REGISTRY_PATH = os.getenv("COMPANY_REGISTRY_PATH")
-VERTEX_AI_PROJECT_ID = os.getenv("VERTEX_AI_PROJECT_ID")
-VERTEX_AI_SEARCH_ENGINE_ID = os.getenv("VERTEX_AI_SEARCH_ENGINE_ID")
-
 # Job Sources Configuration
 ENABLED_SOURCES = [s.strip() for s in os.getenv("ENABLED_SOURCES", "web_scraping").split(",")]
 
@@ -60,12 +55,13 @@ except ValueError as e:
     raise ValueError(f"Invalid SCRAPING_DELAY_SECONDS: {e}")
 
 # Discovery Provider Configuration
-# Available providers: jobspy, google_search, brave_search, serpapi
-# Note: serpapi is recommended for Google Search (reliable API, 250 free/month)
+# Available providers: greenhouse_api, lever_api, ashby_api, serpapi, jobspy, brave_search
+# Direct API providers (greenhouse_api, lever_api, ashby_api) are free and most reliable
+# serpapi uses 3 pages/day = ~90 credits/month (within 250 free limit)
 ENABLED_DISCOVERY_PROVIDERS = [
     p.strip() for p in os.getenv(
         "ENABLED_DISCOVERY_PROVIDERS",
-        "jobspy,brave_search"
+        "greenhouse_api,lever_api,ashby_api,serpapi,jobspy"
     ).split(",") if p.strip()
 ]
 
@@ -81,9 +77,9 @@ SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
 
 # SerpAPI pages (pagination)
 # Each page = 10 results = 1 API credit
-# 5 pages = 50 results = 5 API credits per search
+# 3 pages = 30 results = 3 API credits per search (~90/month for daily runs)
 try:
-    SERPAPI_PAGES = int(os.getenv("SERPAPI_PAGES", "5"))
+    SERPAPI_PAGES = int(os.getenv("SERPAPI_PAGES", "3"))
     if SERPAPI_PAGES < 1:
         raise ValueError("SERPAPI_PAGES must be positive")
     SERPAPI_PAGES = min(SERPAPI_PAGES, 10)  # Cap at 10 pages (100 results)
@@ -128,13 +124,6 @@ _location_terms_raw = os.getenv("LOCATION_TERMS", "")
 LOCATION_TERMS = [
     loc.strip() for loc in _location_terms_raw.split(",") if loc.strip()
 ] or None  # None means use defaults (NY, New York, Remote)
-
-# Location Filter (post-discovery) - DEPRECATED, use LOCATION_TERMS instead
-# Kept for backward compatibility - if set, overrides LOCATION_TERMS for filtering
-_location_filter_raw = os.getenv("LOCATION_FILTER", "")
-LOCATION_FILTER = [
-    loc.strip() for loc in _location_filter_raw.split(",") if loc.strip()
-] or LOCATION_TERMS  # Falls back to LOCATION_TERMS if not set
 
 # Google Search Mode Configuration
 # Options: 'default', 'mid_level', 'exclude_senior', 'combined'
@@ -252,10 +241,20 @@ if DATABASE_MODE == "turso":
             "DATABASE_MODE=turso requires TURSO_DATABASE_URL and TURSO_AUTH_TOKEN to be set"
         )
 
+# Direct API Polling Configuration
+# These providers fetch jobs directly from ATS APIs (free, no rate limits)
+
 # Greenhouse API Configuration
-# Direct API polling for known company boards
 GREENHOUSE_API_ENABLED = os.getenv("GREENHOUSE_API_ENABLED", "true").lower() == "true"
 GREENHOUSE_POLL_CURATED = os.getenv("GREENHOUSE_POLL_CURATED", "true").lower() == "true"
+
+# Lever API Configuration
+LEVER_API_ENABLED = os.getenv("LEVER_API_ENABLED", "true").lower() == "true"
+LEVER_POLL_CURATED = os.getenv("LEVER_POLL_CURATED", "true").lower() == "true"
+
+# Ashby API Configuration
+ASHBY_API_ENABLED = os.getenv("ASHBY_API_ENABLED", "true").lower() == "true"
+ASHBY_POLL_CURATED = os.getenv("ASHBY_POLL_CURATED", "true").lower() == "true"
 
 # Logging Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -291,7 +290,6 @@ except ValueError as e:
 RESUME_FILE = RESUME_DIR / "oscar_resume.txt"
 
 # Validation
-import logging
 _logger = logging.getLogger(__name__)
 
 # Validate source configurations
@@ -310,5 +308,5 @@ if "web_scraping" in ENABLED_SOURCES:
         f"  JobSpy sites: {JOBSPY_SITES}\n"
         f"  JobSpy hours_old: {JOBSPY_HOURS_OLD}\n"
         f"  ATS platforms: {WEB_SCRAPING_PLATFORMS}\n"
-        f"  Location filter: {LOCATION_FILTER or 'None (all locations)'}"
+        f"  Location filter: {LOCATION_TERMS or 'None (all locations)'}"
     )

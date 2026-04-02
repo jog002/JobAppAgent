@@ -1,246 +1,219 @@
-# LinkedIn Job Search Agent
+# Job Search Agent
 
-An AI-powered job search automation system that leverages the LinkedIn MCP server to discover jobs, scores them against user preferences using Claude AI, and generates personalized recommendations.
+An AI-powered job search automation system that discovers jobs from multiple sources, scores them against your resume using Claude/OpenAI, and generates personalized recommendations.
 
-## Overview
+## What It Does
 
-This agent automatically:
-1. Searches LinkedIn for relevant job postings
-2. Scores each job against your specific requirements using Claude AI
-3. Stores results in a local database with deduplication
-4. Generates detailed reports with top recommendations
+1. **Discovers jobs** from ATS platforms (Greenhouse, Lever, Ashby) and job aggregators (Indeed, Google Jobs)
+2. **Scores each job** against your resume using AI (0-100 score)
+3. **Stores results** in a database with deduplication
+4. **Generates reports** with top recommendations
 
 ## Quick Start
 
-### 1. Prerequisites
-
-- Python 3.12+
-- Docker installed and running
-- LinkedIn account (for cookie)
-- OpenAI API key
-
-### 2. Installation
-
 ```bash
-# Clone or create the project directory
+# 1. Clone and setup
 cd JobApp_Agent
-
-# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Pull LinkedIn MCP Docker image
-docker pull stickerdaniel/linkedin-mcp-server:latest
-```
-
-### 3. Configuration
-
-Create a `.env` file in the project root:
-
-```bash
+# 2. Configure
 cp .env.example .env
-```
+# Edit .env with your Claude API key
 
-Edit `.env` and add your credentials:
+# 3. Add your resume
+# Edit resume/oscar_resume.txt with your resume
 
-```env
-# Get your LinkedIn cookie (li_at value):
-# 1. Log into LinkedIn in your browser
-# 2. Open DevTools (F12) → Application → Cookies → https://www.linkedin.com
-# 3. Copy the value of the 'li_at' cookie
-LINKEDIN_COOKIE=your_li_at_cookie_value_here
-
-# Get your OpenAI API key from https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o
-OPENAI_TEMPERATURE=0.3
-OPENAI_MAX_TOKENS=1000
-```
-
-### 4. Customize Your Resume
-
-Edit `resume/oscar_resume.txt` with your own resume content. This is used by Claude to match jobs to your experience.
-
-### 5. Run the Agent
-
-```bash
+# 4. Run
 python main.py
 ```
 
-## How It Works
+## Configuration
 
-### Job Scoring System (0-100 points)
+All configuration is in `.env`. See `.env.example` for all options with inline documentation.
+
+### Required Settings
+
+```env
+LLM_PROVIDER=claude
+CLAUDE_API_KEY=sk-ant-your-key-here
+```
+
+### Key Options
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `SEARCH_KEYWORDS` | software engineer | Comma-separated job titles to search |
+| `SEARCH_LOCATIONS` | Remote,New York | Comma-separated locations |
+| `MIN_DISPLAY_SCORE` | 60 | Minimum AI score to show (0-100) |
+| `DATABASE_MODE` | local | `local` (SQLite) or `turso` (cloud) |
+
+## Discovery Providers
+
+The agent uses multiple providers to find jobs. All are free.
+
+### Direct API Polling (Recommended)
+
+These poll company job boards directly. No rate limits, complete job data.
+
+| Provider | Companies | Enable/Disable |
+|----------|-----------|----------------|
+| Greenhouse API | 250+ tech companies | `GREENHOUSE_API_ENABLED=true` |
+| Lever API | 80+ tech companies | `LEVER_API_ENABLED=true` |
+| Ashby API | 50+ tech companies | `ASHBY_API_ENABLED=true` |
+
+### Job Aggregators
+
+| Provider | Description | Config |
+|----------|-------------|--------|
+| JobSpy | Aggregates Indeed, Google Jobs | `JOBSPY_SITES=indeed,google` |
+| SerpAPI | Google Search for job URLs | `SERPAPI_API_KEY` (250 free/month) |
+| Brave Search | Backup URL discovery | `BRAVE_API_KEY` (2000 free/month) |
+
+### Default Configuration
+
+```env
+ENABLED_DISCOVERY_PROVIDERS=greenhouse_api,lever_api,ashby_api,serpapi,jobspy
+```
+
+## Job Scoring (0-100 points)
 
 Jobs are scored based on 5 criteria:
 
-1. **Remote Work Flexibility (30 points)**
-   - Remote: 30 points
-   - Hybrid (NYC): 20 points
-   - On-site (NYC): 10 points
-   - On-site (Other): 0 points
-
-2. **Salary Range (35 points)**
-   - $165k+: 35 points (excellent)
-   - $150k-164k: 28 points (good)
-   - $140k-149k: 20 points (acceptable)
-   - $130k-139k: 10 points (marginal)
-   - Below $130k: 0 points
-
-3. **Company Type (20 points)**
-   - FAANG: 20 points
-   - Big Tech: 18 points
-   - Tech Unicorns: 15 points
-   - Top Finance: 14 points
-   - Other: 5-10 points
-
-4. **AI/ML Relevance (10 points)**
-   - Primary focus: 10 points
-   - Significant component: 7 points
-   - Some work: 4 points
-   - None: 0 points
-
-5. **Title/Level Match (5 points)**
-   - SWE II: 5 points
-   - Mid-level: 4 points
-   - Senior: 3 points
-   - Junior: 0 points
+| Criteria | Points | Description |
+|----------|--------|-------------|
+| Remote Work | 30 | Remote=30, Hybrid=20, On-site=10 |
+| Salary | 35 | Based on your target range |
+| Company Type | 20 | FAANG/Big Tech/Unicorn tiers |
+| AI/ML Relevance | 10 | Based on job description |
+| Title Match | 5 | SWE II/Mid-level targeting |
 
 ### Score Interpretation
 
-- **90-100**: Excellent match - Top priority
-- **75-89**: Strong match - Definitely review and apply
-- **60-74**: Good match - Review carefully
-- **45-59**: Moderate match - Consider if aligned
-- **<45**: Poor match - Archive
+- **90-100**: Top priority - apply immediately
+- **75-89**: Strong match - definitely apply
+- **60-74**: Good match - review carefully
+- **<60**: Lower match - filtered out by default
+
+## Database Options
+
+### Local SQLite (default)
+
+```env
+DATABASE_MODE=local
+DATABASE_PATH=./data/jobs.db
+```
+
+### Turso Cloud Database
+
+For persistence across environments or CI/CD:
+
+```env
+DATABASE_MODE=turso
+TURSO_DATABASE_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=your-token
+```
+
+Setup:
+```bash
+# Install Turso CLI
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# Create database
+turso db create jobagent
+turso db show jobagent --url
+turso db tokens create jobagent
+```
+
+## Running Modes
+
+```bash
+# Interactive mode - run once
+python main.py
+
+# Batch mode - for automation/cron
+python main.py batch
+```
 
 ## Project Structure
 
 ```
 JobApp_Agent/
-├── config.py              # Configuration management
-├── database.py            # SQLite database operations
-├── linkedin_client.py     # LinkedIn MCP server interface
-├── scoring_engine.py      # Claude AI job scoring
-├── main.py                # Main application entry point
-├── requirements.txt       # Python dependencies
-├── .env                   # Environment variables (create this)
-├── .env.example           # Environment template
-├── .gitignore             # Git ignore rules
+├── main.py                 # Entry point
+├── config.py               # Configuration
+├── database.py             # Database operations
+├── scoring_engine.py       # AI job scoring
+├── sources/
+│   ├── web_scraping/       # Main job source
+│   │   ├── discovery/      # Job discovery providers
+│   │   └── scrapers/       # ATS-specific scrapers
+│   └── linkedin/           # Legacy LinkedIn source
+├── resume/
+│   └── oscar_resume.txt    # Your resume
 ├── data/
-│   └── jobs.db           # SQLite database (auto-created)
-├── logs/
-│   └── agent.log         # Application logs (auto-created)
-└── resume/
-    └── oscar_resume.txt  # Your resume for job matching
+│   └── jobs.db             # SQLite database
+└── logs/
+    └── agent.log           # Application logs
 ```
-
-## Configuration Options
-
-All configuration is done via the `.env` file:
-
-```env
-# OpenAI Configuration
-OPENAI_MODEL=gpt-4o              # Model to use (gpt-4o, gpt-4o-mini, gpt-4-turbo, etc.)
-OPENAI_TEMPERATURE=0.3           # Lower = more deterministic (0.0-2.0)
-OPENAI_MAX_TOKENS=1000           # Max tokens for response
-
-# Search Configuration
-SEARCH_KEYWORDS=software engineer,ai engineer,machine learning engineer
-SEARCH_LOCATIONS=Remote,New York
-MAX_RESULTS_PER_SEARCH=50
-
-# Scoring Configuration
-MIN_DISPLAY_SCORE=60
-TOP_JOBS_LIMIT=20
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE=./logs/agent.log
-```
-
-### Available OpenAI Models
-
-- **gpt-4o** (default) - Latest GPT-4 Omni, best quality, ~$2.50/M input tokens
-- **gpt-4o-mini** - Faster and cheaper, ~$0.15/M input tokens, good quality
-- **gpt-4-turbo** - Previous generation, ~$10/M input tokens
-- **gpt-3.5-turbo** - Cheapest option, ~$0.50/M input tokens, lower quality
-
-**Recommendation**: Use `gpt-4o-mini` for cost savings with minimal quality loss.
 
 ## Troubleshooting
 
-### LinkedIn Cookie Issues
-
-**Problem**: "Cookie invalid" error
-- **Solution**: LinkedIn cookies expire every ~30 days. Get a fresh cookie:
-  1. Log into LinkedIn in your browser
-  2. F12 → Application → Cookies → https://www.linkedin.com
-  3. Copy the `li_at` cookie value
-  4. Update your `.env` file
-
-### Docker Issues
-
-**Problem**: "Docker not found" or timeout errors
-- **Solution**: Ensure Docker is running
-  ```bash
-  docker ps  # Should list running containers
-  ```
-
 ### No Jobs Found
 
-**Problem**: Zero jobs returned from search
-- **Solution**: Check:
-  1. LinkedIn cookie is valid
-  2. Search keywords are appropriate
-  3. LinkedIn account is in good standing
-  4. Check logs for detailed errors
+1. Check logs: `tail -f logs/agent.log`
+2. Verify API keys are set correctly
+3. Try running with `LOG_LEVEL=DEBUG`
 
-### Claude API Errors
+### API Errors
 
-**Problem**: Rate limits or API errors
-- **Solution**:
-  1. Check your Anthropic API key is valid
-  2. Ensure you have available credits
-  3. Add delays between API calls if needed
+- **Claude/OpenAI**: Verify API key and credits
+- **SerpAPI**: Check monthly quota (250 free)
+- **Brave Search**: Check monthly quota (2000 free)
 
-## Future Enhancements
+---
 
-- Email notifications for new high-scoring jobs
-- Automated application submission for "Easy Apply" jobs
-- Daily automated runs via cron/scheduled tasks
-- Web dashboard for viewing results
-- Application tracking and follow-up management
+## Legacy Features
 
-## Database Schema
+These features are deprecated but still functional if needed.
 
-The agent uses SQLite to store jobs and track search runs. Two main tables:
+### LinkedIn MCP Server
 
-### jobs
-- Stores all discovered jobs with scores and metadata
-- Deduplicates based on `linkedin_job_id`
-- Tracks status: new, reviewed, applied, rejected, archived
+The LinkedIn source requires Docker and a LinkedIn cookie. It has rate limiting issues and is not recommended.
 
-### search_runs
-- Logs each execution of the agent
-- Tracks statistics and performance metrics
-- Useful for debugging and optimization
+```env
+# Enable LinkedIn source
+ENABLED_SOURCES=web_scraping,linkedin
 
-## Security Notes
+# Method 1: Cookie-based
+LINKEDIN_COOKIE=your-li_at-cookie
 
-- Never commit `.env` file to version control
-- Keep your LinkedIn cookie secure
-- Keep your Anthropic API key secure
-- Rotate credentials regularly
+# Method 2: Session file
+LINKEDIN_SESSION_PATH=/path/to/session.json
+```
 
-## License
+Setup:
+```bash
+docker pull stickerdaniel/linkedin-mcp-server:latest
+```
 
-Private project for personal use.
+### Google Search Provider
 
-## Support
+Removed due to CAPTCHA and rate limiting issues. Use SerpAPI or Brave Search instead.
 
-For issues with:
-- LinkedIn MCP Server: [GitHub Issues](https://github.com/stickerdaniel/linkedin-mcp-server/issues)
-- Anthropic API: [Documentation](https://docs.anthropic.com)
+### Scheduled Batch Jobs (macOS)
+
+If you previously set up scheduled runs, uninstall with:
+
+```bash
+# Unload the launchd agent
+launchctl unload ~/Library/LaunchAgents/com.oscar.jobagent.batch.plist
+rm ~/Library/LaunchAgents/com.oscar.jobagent.batch.plist
+
+# Cancel the wake schedule
+sudo pmset repeat cancel
+
+# Verify removal
+pmset -g sched
+launchctl list | grep jobagent
+```

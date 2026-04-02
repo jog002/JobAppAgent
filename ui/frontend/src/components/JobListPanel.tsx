@@ -1,4 +1,5 @@
-import { Box, Paper, Typography, CircularProgress } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress, Chip } from '@mui/material';
+import WorkOutlineIcon from '@mui/icons-material/WorkOutline';
 import JobCard from './JobCard';
 import type { Job, JobStatus } from '../types';
 
@@ -30,23 +31,39 @@ export default function JobListPanel({
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        border: '1px solid #e2e8f0',
+        borderRadius: 3,
       }}
     >
       {/* Header */}
       <Box
         sx={{
-          px: 2,
-          py: 1.5,
-          borderBottom: '1px solid #e0e0e0',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          px: 2.5,
+          py: 2,
+          borderBottom: '1px solid #e2e8f0',
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
           color: 'white',
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
-          {title}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
+            {title}
+          </Typography>
+          <Chip
+            label={jobs.length}
+            size="small"
+            sx={{
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              height: 24,
+              minWidth: 32,
+            }}
+          />
+        </Box>
         {subtitle && (
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
+          <Typography variant="caption" sx={{ opacity: 0.85, display: 'block', mt: 0.5 }}>
             {subtitle}
           </Typography>
         )}
@@ -59,26 +76,44 @@ export default function JobListPanel({
           overflow: 'auto',
           p: 2,
           maxHeight,
+          backgroundColor: '#f8fafc',
         }}
       >
         {isLoading ? (
           <Box
             sx={{
               display: 'flex',
+              flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              py: 4,
+              py: 6,
+              gap: 2,
             }}
           >
-            <CircularProgress size={32} />
+            <CircularProgress size={36} sx={{ color: '#6366f1' }} />
+            <Typography variant="body2" color="text.secondary">
+              Loading jobs...
+            </Typography>
           </Box>
         ) : jobs.length === 0 ? (
-          <Typography
-            variant="body2"
-            sx={{ color: '#888', textAlign: 'center', py: 4 }}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              py: 6,
+              gap: 1.5,
+            }}
           >
-            {emptyMessage}
-          </Typography>
+            <WorkOutlineIcon sx={{ fontSize: 48, color: '#cbd5e1' }} />
+            <Typography
+              variant="body2"
+              sx={{ color: '#94a3b8', textAlign: 'center' }}
+            >
+              {emptyMessage}
+            </Typography>
+          </Box>
         ) : (
           jobs.map((job) => (
             <JobCard
@@ -89,20 +124,6 @@ export default function JobListPanel({
             />
           ))
         )}
-      </Box>
-
-      {/* Footer with count */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1,
-          borderTop: '1px solid #e0e0e0',
-          backgroundColor: '#f8f9fa',
-        }}
-      >
-        <Typography variant="caption" sx={{ color: '#666' }}>
-          {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-        </Typography>
       </Box>
     </Paper>
   );

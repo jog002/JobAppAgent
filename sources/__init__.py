@@ -79,17 +79,12 @@ def get_enabled_sources(config) -> List[BaseJobSource]:
                     enabled_platforms=config.WEB_SCRAPING_PLATFORMS,
                     enabled_discovery_providers=getattr(config, 'ENABLED_DISCOVERY_PROVIDERS', None),
                     scraping_delay=config.SCRAPING_DELAY_SECONDS,
-                    location_filter=getattr(config, 'LOCATION_FILTER', None),
+                    location_filter=getattr(config, 'LOCATION_TERMS', None),
                     jobspy_sites=getattr(config, 'JOBSPY_SITES', None),
                     jobspy_hours_old=getattr(config, 'JOBSPY_HOURS_OLD', 72),
-                    # Google Search mode configuration
                     search_mode=getattr(config, 'SEARCH_MODE', 'combined'),
                     level_terms=getattr(config, 'LEVEL_TERMS', None),
                     exclude_terms=getattr(config, 'EXCLUDE_LEVELS', None),
-                    # Legacy parameters for backward compatibility
-                    vertex_ai_project_id=getattr(config, 'VERTEX_AI_PROJECT_ID', None),
-                    vertex_ai_search_engine_id=getattr(config, 'VERTEX_AI_SEARCH_ENGINE_ID', None),
-                    company_registry_path=getattr(config, 'COMPANY_REGISTRY_PATH', None)
                 )
             else:
                 source = get_source(name)
