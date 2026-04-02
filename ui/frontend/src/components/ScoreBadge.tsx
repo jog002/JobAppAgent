@@ -3,7 +3,7 @@ import { getScoreColor, scoreColors } from '../theme';
 
 interface ScoreBadgeProps {
   score: number | undefined | null;
-  size?: 'small' | 'medium';
+  size?: 'small' | 'medium' | 'large';
 }
 
 export default function ScoreBadge({ score, size = 'medium' }: ScoreBadgeProps) {
@@ -12,6 +12,32 @@ export default function ScoreBadge({ score, size = 'medium' }: ScoreBadgeProps) 
 
   const displayScore = score !== undefined && score !== null ? score : '—';
 
+  const sizeStyles = {
+    small: {
+      px: 1,
+      py: 0.25,
+      fontSize: '0.75rem',
+      minWidth: '36px',
+      borderRadius: '8px',
+    },
+    medium: {
+      px: 1.5,
+      py: 0.5,
+      fontSize: '0.875rem',
+      minWidth: '44px',
+      borderRadius: '10px',
+    },
+    large: {
+      px: 2,
+      py: 0.75,
+      fontSize: '1rem',
+      minWidth: '52px',
+      borderRadius: '12px',
+    },
+  };
+
+  const styles = sizeStyles[size];
+
   return (
     <Box
       component="span"
@@ -19,15 +45,14 @@ export default function ScoreBadge({ score, size = 'medium' }: ScoreBadgeProps) 
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        px: size === 'small' ? 1 : 1.5,
-        py: size === 'small' ? 0.25 : 0.5,
-        borderRadius: '12px',
-        fontSize: size === 'small' ? '0.75rem' : '0.875rem',
-        fontWeight: 600,
+        fontWeight: 700,
+        fontVariantNumeric: 'tabular-nums',
         backgroundColor: colors.bg,
         color: colors.text,
-        border: `1px solid ${colors.border}`,
-        minWidth: size === 'small' ? '36px' : '48px',
+        border: `1.5px solid ${colors.border}`,
+        boxShadow: `0 1px 2px 0 ${colors.border}20`,
+        transition: 'all 0.15s ease',
+        ...styles,
       }}
     >
       {displayScore}

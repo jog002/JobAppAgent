@@ -247,6 +247,15 @@ def run_job_search() -> dict:
         # Calculate statistics
         duration_seconds = time.time() - start_time
         token_stats = scoring_engine.get_token_usage()
+
+        # Calculate estimated cost based on provider
+        if LLM_PROVIDER == "claude":
+            estimated_cost = (token_stats.prompt_tokens * CLAUDE_INPUT_COST_PER_M +
+                            token_stats.completion_tokens * CLAUDE_OUTPUT_COST_PER_M) / 1_000_000
+        else:
+            estimated_cost = (token_stats.prompt_tokens * OPENAI_INPUT_COST_PER_M +
+                            token_stats.completion_tokens * OPENAI_OUTPUT_COST_PER_M) / 1_000_000
+
         stats = {
             'jobs_found': len(all_jobs),
             'jobs_new': len(new_jobs),
@@ -255,7 +264,8 @@ def run_job_search() -> dict:
             'tokens_used': token_stats.total_tokens,
             'prompt_tokens': token_stats.prompt_tokens,
             'completion_tokens': token_stats.completion_tokens,
-            'api_calls': token_stats.api_calls
+            'api_calls': token_stats.api_calls,
+            'estimated_cost': estimated_cost
         }
 
         # Complete search run

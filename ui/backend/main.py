@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import jobs_router, runs_router, logs_router
+from routes import jobs_router, runs_router, logs_router, config_router
 
 # Initialize database on startup
 import database as db
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(jobs_router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(runs_router, prefix="/api/runs", tags=["Runs"])
 app.include_router(logs_router, prefix="/api/logs", tags=["Logs"])
+app.include_router(config_router, prefix="/api/config", tags=["Config"])
 
 
 @app.on_event("startup")

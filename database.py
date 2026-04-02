@@ -200,15 +200,24 @@ CREATE INDEX IF NOT EXISTS idx_jobs_linkedin_id ON jobs(linkedin_job_id);
 
 CREATE TABLE IF NOT EXISTS search_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_number INTEGER,
     run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     jobs_found INTEGER DEFAULT 0,
     jobs_new INTEGER DEFAULT 0,
     jobs_updated INTEGER DEFAULT 0,
     search_queries TEXT,
+    source TEXT DEFAULT 'all',
     status TEXT DEFAULT 'running',
     error_message TEXT,
-    duration_seconds REAL
+    duration_seconds REAL,
+    tokens_used INTEGER DEFAULT 0,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    api_calls INTEGER DEFAULT 0,
+    estimated_cost REAL DEFAULT 0.0
 );
+
+CREATE INDEX IF NOT EXISTS idx_search_runs_number ON search_runs(run_number DESC);
 
 CREATE TABLE IF NOT EXISTS greenhouse_tokens (
     token TEXT PRIMARY KEY,
@@ -347,6 +356,38 @@ def init_database():
     migrate_database()
 
 
+def _get_table_columns(cursor, table_name: str) -> list[str]:
+    """
+    Get column names for a table, compatible with both sqlite3 and libsql.
+
+    Args:
+        cursor: Database cursor
+        table_name: Name of the table
+
+    Returns:
+        List of column names
+    """
+    try:
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        rows = cursor.fetchall()
+        columns = []
+        for row in rows:
+            # Handle both sqlite3.Row (dict-like) and tuple formats
+            if hasattr(row, 'keys'):
+                # Dict-like row (sqlite3.Row or TursoRowWrapper)
+                columns.append(row['name'] if 'name' in row.keys() else row[1])
+            elif isinstance(row, (list, tuple)):
+                # Tuple format: (cid, name, type, notnull, dflt_value, pk)
+                columns.append(row[1])
+            else:
+                # Fallback - try index access
+                columns.append(row[1])
+        return columns
+    except Exception as e:
+        logger.warning(f"Failed to get columns for {table_name}: {e}")
+        return []
+
+
 def migrate_database():
     """
     Migrate existing database to support multi-source jobs.
@@ -357,9 +398,9 @@ def migrate_database():
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # Check if source column exists
-        cursor.execute("PRAGMA table_info(jobs)")
-        columns = [row[1] for row in cursor.fetchall()]
+        # Check if source column exists in jobs table
+        columns = _get_table_columns(cursor, 'jobs')
+        logger.debug(f"Jobs table columns: {columns}")
 
         if 'source' not in columns:
             logger.info("Adding source column")
@@ -382,27 +423,36 @@ def migrate_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_first_seen_run ON jobs(first_seen_run_id)")
 
-        # Add source column to search_runs if it doesn't exist
-        cursor.execute("PRAGMA table_info(search_runs)")
-        search_run_columns = [row[1] for row in cursor.fetchall()]
+        # Check search_runs columns
+        search_run_columns = _get_table_columns(cursor, 'search_runs')
+        logger.debug(f"search_runs table columns: {search_run_columns}")
 
         if 'source' not in search_run_columns:
             logger.info("Adding source column to search_runs")
             cursor.execute("ALTER TABLE search_runs ADD COLUMN source TEXT DEFAULT 'all'")
 
-        # Add run_number column to search_runs for sequential numbering
+        # Add run_number column to search_runs for sequential numbering (legacy migration)
         if 'run_number' not in search_run_columns:
             logger.info("Adding run_number column to search_runs")
             cursor.execute("ALTER TABLE search_runs ADD COLUMN run_number INTEGER")
-            # Backfill run_numbers based on existing IDs
-            cursor.execute("""
-                UPDATE search_runs
-                SET run_number = (
-                    SELECT COUNT(*)
-                    FROM search_runs s2
-                    WHERE s2.id <= search_runs.id
+            # Backfill run_numbers based on existing IDs using a simpler approach
+            cursor.execute("SELECT id FROM search_runs ORDER BY id ASC")
+            rows = cursor.fetchall()
+            for i, row in enumerate(rows, start=1):
+                run_id = row[0] if isinstance(row, (list, tuple)) else row['id']
+                cursor.execute(
+                    "UPDATE search_runs SET run_number = ? WHERE id = ?",
+                    (i, run_id)
                 )
-            """)
+            logger.info(f"Backfilled run_number for {len(rows)} existing runs")
+
+        # Add token tracking columns (for cost monitoring)
+        token_columns = ['tokens_used', 'prompt_tokens', 'completion_tokens', 'api_calls', 'estimated_cost']
+        for col in token_columns:
+            if col not in search_run_columns:
+                col_type = 'REAL' if col == 'estimated_cost' else 'INTEGER'
+                logger.info(f"Adding {col} column to search_runs")
+                cursor.execute(f"ALTER TABLE search_runs ADD COLUMN {col} {col_type} DEFAULT 0")
 
     logger.info("Database migration completed")
 
@@ -561,7 +611,7 @@ def get_run_info(run_id: int) -> Optional[dict]:
 
 
 def complete_search_run(run_id: int, stats: dict, error: Optional[str] = None) -> None:
-    """Mark search run as complete with statistics."""
+    """Mark search run as complete with statistics including token usage."""
     status = 'failed' if error else 'completed'
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -572,7 +622,12 @@ def complete_search_run(run_id: int, stats: dict, error: Optional[str] = None) -
                 jobs_new = ?,
                 jobs_updated = ?,
                 error_message = ?,
-                duration_seconds = ?
+                duration_seconds = ?,
+                tokens_used = ?,
+                prompt_tokens = ?,
+                completion_tokens = ?,
+                api_calls = ?,
+                estimated_cost = ?
             WHERE id = ?
         """, (
             status,
@@ -581,6 +636,11 @@ def complete_search_run(run_id: int, stats: dict, error: Optional[str] = None) -
             stats.get('jobs_updated', 0),
             error,
             stats.get('duration_seconds', 0),
+            stats.get('tokens_used', 0),
+            stats.get('prompt_tokens', 0),
+            stats.get('completion_tokens', 0),
+            stats.get('api_calls', 0),
+            stats.get('estimated_cost', 0.0),
             run_id
         ))
         logger.info(f"Completed search run {run_id}: {status}")

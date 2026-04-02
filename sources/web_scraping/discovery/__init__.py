@@ -6,21 +6,27 @@ This module provides a pluggable architecture for job discovery:
 - Filters: Post-discovery filtering functions
 
 Providers:
+- GreenhouseAPIProvider: Direct Greenhouse API polling (free, full data)
+- LeverAPIProvider: Direct Lever API polling (free, full data)
+- AshbyAPIProvider: Direct Ashby API polling (free, full data)
 - JobSpyProvider: Uses JobSpy to search Indeed, Google Jobs, LinkedIn, etc.
-- GoogleSearchProvider: Uses Google Search to find ATS job board URLs
+- SerpAPIProvider: Uses SerpAPI for Google Search (reliable, 250 free/month)
+- BraveSearchProvider: Uses Brave Search API (2k free/month)
 
 Example:
     from sources.web_scraping.discovery import (
         DiscoveryManager,
-        JobSpyProvider,
-        GoogleSearchProvider
+        GreenhouseAPIProvider,
+        LeverAPIProvider,
+        JobSpyProvider
     )
     from sources.web_scraping.discovery.filters import create_location_filter
 
     # Create manager with providers
     manager = DiscoveryManager()
+    manager.add_provider(GreenhouseAPIProvider())
+    manager.add_provider(LeverAPIProvider())
     manager.add_provider(JobSpyProvider())
-    manager.add_provider(GoogleSearchProvider(platforms=['greenhouse', 'lever']))
 
     # Add filters
     manager.add_filter(create_location_filter(['Remote', 'New York']))
@@ -253,9 +259,14 @@ except ImportError:
     JobSpyProvider = None  # JobSpy not installed
 
 try:
-    from .google_search_provider import GoogleSearchProvider
+    from .lever_api_provider import LeverAPIProvider
 except ImportError:
-    GoogleSearchProvider = None  # googlesearch-python not installed
+    LeverAPIProvider = None
+
+try:
+    from .ashby_api_provider import AshbyAPIProvider
+except ImportError:
+    AshbyAPIProvider = None
 
 try:
     from .brave_search_provider import BraveSearchProvider
@@ -279,10 +290,11 @@ __all__ = [
     'DiscoveredJob',
     'DiscoveryManager',
     'JobSpyProvider',
-    'GoogleSearchProvider',
     'BraveSearchProvider',
     'SerpAPIProvider',
     'GreenhouseAPIProvider',
+    'LeverAPIProvider',
+    'AshbyAPIProvider',
     'extract_greenhouse_token',
     'FilterFunc',
 ]

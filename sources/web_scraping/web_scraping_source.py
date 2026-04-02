@@ -1,11 +1,20 @@
 """Web scraping job source using pluggable discovery providers.
 
 This module provides job discovery through multiple providers:
-- JobSpy: Aggregates from Indeed, Google Jobs, LinkedIn, etc.
-- Google Search: Finds jobs on Greenhouse, Lever, Ashby via search
-- Brave Search: Uses Brave Search API for ATS job boards (recommended)
 
-Jobs discovered with full data (from JobSpy) skip scraping.
+Direct API Providers (recommended, free, full data):
+- Greenhouse API: Polls ~150 tech company job boards directly
+- Lever API: Polls ~80 tech company job boards directly
+- Ashby API: Polls ~50 tech company job boards directly
+
+Aggregator Providers:
+- JobSpy: Aggregates from Indeed, Google Jobs, LinkedIn, etc.
+
+Search-based Providers (for discovering additional companies):
+- SerpAPI: Google Search via API (250 free/month)
+- Brave Search: Uses Brave Search API (2k free/month)
+
+Jobs discovered with full data skip scraping.
 Jobs discovered as URLs only are scraped using platform-specific scrapers.
 """
 
@@ -28,9 +37,12 @@ class WebScrapingSource(BaseJobSource):
     then uses platform-specific scrapers to extract full job details when needed.
 
     Discovery Providers:
+        - Greenhouse API: Direct polling, returns full data (recommended)
+        - Lever API: Direct polling, returns full data (recommended)
+        - Ashby API: Direct polling, returns full data (recommended)
         - JobSpy: Returns full job data (no scraping needed)
-        - Google Search: Returns URLs (scraping needed) - may get rate limited
-        - Brave Search: Returns URLs via Brave API (recommended)
+        - SerpAPI: Google Search via API (reliable, 250 free/month)
+        - Brave Search: Returns URLs via Brave API (2k free/month)
 
     Scrapers (for URL-only discoveries):
         - GreenhouseScraper
@@ -62,7 +74,7 @@ class WebScrapingSource(BaseJobSource):
             enabled_platforms: ATS platforms to search via Google Search
                 (greenhouse, lever, bamboohr, ashby)
             enabled_discovery_providers: Discovery providers to use
-                (jobspy, google_search)
+                (greenhouse_api, lever_api, ashby_api, serpapi, jobspy, brave_search)
             scraping_delay: Delay between scraping requests (seconds)
             location_filter: List of locations to filter results
                 (e.g., ['Remote', 'New York'])
@@ -89,7 +101,7 @@ class WebScrapingSource(BaseJobSource):
 
         # Initialize discovery manager
         self.discovery_manager = self._create_discovery_manager(
-            enabled_providers=enabled_discovery_providers or ['jobspy', 'google_search'],
+            enabled_providers=enabled_discovery_providers or ['greenhouse_api', 'lever_api', 'ashby_api', 'serpapi', 'jobspy'],
             location_filter=location_filter
         )
 
@@ -128,24 +140,46 @@ class WebScrapingSource(BaseJobSource):
                     "JobSpy provider not available: python-jobspy not installed"
                 )
 
-        # Add Google Search provider
-        if 'google_search' in enabled_providers:
+        # Add Lever API provider (direct API polling)
+        if 'lever_api' in enabled_providers:
             try:
-                from .discovery.google_search_provider import GoogleSearchProvider
-                manager.add_provider(GoogleSearchProvider(
-                    platforms=self.enabled_platforms,
-                    search_mode=self.search_mode,
-                    level_terms=self.level_terms,
-                    exclude_terms=self.exclude_terms
-                ))
-                logger.info(
-                    f"Added Google Search provider (platforms={self.enabled_platforms}, "
-                    f"mode='{self.search_mode}')"
-                )
-            except ImportError:
+                from .discovery.lever_api_provider import LeverAPIProvider
+                lever_enabled = os.getenv('LEVER_API_ENABLED', 'true').lower() == 'true'
+                use_curated = os.getenv('LEVER_POLL_CURATED', 'true').lower() == 'true'
+
+                if lever_enabled:
+                    manager.add_provider(LeverAPIProvider(
+                        use_curated=use_curated
+                    ))
+                    logger.info(
+                        f"Added Lever API provider (curated={use_curated})"
+                    )
+                else:
+                    logger.info("Lever API provider disabled via LEVER_API_ENABLED")
+            except ImportError as e:
                 logger.warning(
-                    "Google Search provider not available: "
-                    "googlesearch-python not installed"
+                    f"Lever API provider not available: {e}"
+                )
+
+        # Add Ashby API provider (direct API polling)
+        if 'ashby_api' in enabled_providers:
+            try:
+                from .discovery.ashby_api_provider import AshbyAPIProvider
+                ashby_enabled = os.getenv('ASHBY_API_ENABLED', 'true').lower() == 'true'
+                use_curated = os.getenv('ASHBY_POLL_CURATED', 'true').lower() == 'true'
+
+                if ashby_enabled:
+                    manager.add_provider(AshbyAPIProvider(
+                        use_curated=use_curated
+                    ))
+                    logger.info(
+                        f"Added Ashby API provider (curated={use_curated})"
+                    )
+                else:
+                    logger.info("Ashby API provider disabled via ASHBY_API_ENABLED")
+            except ImportError as e:
+                logger.warning(
+                    f"Ashby API provider not available: {e}"
                 )
 
         # Add Brave Search provider

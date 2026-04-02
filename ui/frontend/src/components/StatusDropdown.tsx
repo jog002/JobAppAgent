@@ -1,4 +1,4 @@
-import { Select, MenuItem } from '@mui/material';
+import { Select, MenuItem, alpha } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import type { JobStatus } from '../types';
 import { JOB_STATUSES, STATUS_LABELS } from '../types';
@@ -10,13 +10,13 @@ interface StatusDropdownProps {
   size?: 'small' | 'medium';
 }
 
-// Status colors for visual distinction
-const statusColors: Record<JobStatus, string> = {
-  new: '#667eea',
-  reviewed: '#17a2b8',
-  applied: '#28a745',
-  not_interested: '#6c757d',
-  deleted: '#dc3545',
+// Modern status color configuration
+const statusConfig: Record<JobStatus, { color: string; bg: string }> = {
+  new: { color: '#6366f1', bg: '#eef2ff' },
+  reviewed: { color: '#0ea5e9', bg: '#f0f9ff' },
+  applied: { color: '#10b981', bg: '#ecfdf5' },
+  not_interested: { color: '#64748b', bg: '#f1f5f9' },
+  deleted: { color: '#ef4444', bg: '#fef2f2' },
 };
 
 export default function StatusDropdown({
@@ -29,6 +29,8 @@ export default function StatusDropdown({
     onChange(event.target.value as JobStatus);
   };
 
+  const currentConfig = statusConfig[status] || statusConfig.new;
+
   return (
     <Select
       value={status}
@@ -36,26 +38,55 @@ export default function StatusDropdown({
       disabled={disabled}
       size={size}
       sx={{
-        minWidth: 120,
+        minWidth: 130,
+        borderRadius: '8px',
+        backgroundColor: currentConfig.bg,
         '& .MuiSelect-select': {
-          py: size === 'small' ? 0.5 : 1,
-          color: statusColors[status] || '#333',
-          fontWeight: 500,
+          py: size === 'small' ? 0.75 : 1,
+          color: currentConfig.color,
+          fontWeight: 600,
+          fontSize: '0.8rem',
+        },
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderColor: alpha(currentConfig.color, 0.3),
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: alpha(currentConfig.color, 0.5),
+        },
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderColor: currentConfig.color,
+          borderWidth: 1.5,
+        },
+        '& .MuiSvgIcon-root': {
+          color: currentConfig.color,
         },
       }}
     >
-      {JOB_STATUSES.map((s) => (
-        <MenuItem
-          key={s}
-          value={s}
-          sx={{
-            color: statusColors[s],
-            fontWeight: 500,
-          }}
-        >
-          {STATUS_LABELS[s]}
-        </MenuItem>
-      ))}
+      {JOB_STATUSES.map((s) => {
+        const config = statusConfig[s];
+        return (
+          <MenuItem
+            key={s}
+            value={s}
+            sx={{
+              color: config.color,
+              fontWeight: 500,
+              fontSize: '0.85rem',
+              '&:hover': {
+                backgroundColor: config.bg,
+              },
+              '&.Mui-selected': {
+                backgroundColor: config.bg,
+                '&:hover': {
+                  backgroundColor: config.bg,
+                },
+              },
+            }}
+          >
+            {STATUS_LABELS[s]}
+          </MenuItem>
+        );
+      })}
     </Select>
   );
 }
