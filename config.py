@@ -151,6 +151,15 @@ EXCLUDE_LEVELS = [
     t.strip() for t in _exclude_levels_raw.split(",") if t.strip()
 ] or None  # None means use defaults
 
+# Title Keywords Filter (comma-separated)
+# Jobs must have at least one of these keywords in the title to pass filtering
+# Used to filter out non-software roles when polling API providers
+# Empty string disables the filter (all jobs pass through)
+_title_keywords_raw = os.getenv("TITLE_KEYWORDS", "engineer,developer,software,swe,sde,programmer,backend,frontend,fullstack,full-stack,devops,platform,infrastructure,systems")
+TITLE_KEYWORDS = [
+    kw.strip() for kw in _title_keywords_raw.split(",") if kw.strip()
+] or None  # None disables the filter
+
 # LLM API Provider Selection
 # Options: "claude" or "openai"
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "claude").lower()
