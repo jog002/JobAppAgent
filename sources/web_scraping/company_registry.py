@@ -6,7 +6,7 @@ This registry contains companies across different categories:
 - Y Combinator companies
 - Remote-first companies
 
-Users can customize this list or provide their own via COMPANY_REGISTRY_PATH in .env
+Users can customize this list by editing this file directly.
 """
 
 COMPANY_REGISTRY = [

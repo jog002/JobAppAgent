@@ -59,14 +59,10 @@ class WebScrapingSource(BaseJobSource):
         location_filter: List[str] = None,
         jobspy_sites: List[str] = None,
         jobspy_hours_old: int = 72,
-        # Google Search mode configuration
         search_mode: str = 'combined',
         level_terms: List[str] = None,
         exclude_terms: List[str] = None,
-        # Legacy parameters (backward compatibility)
-        vertex_ai_project_id: Optional[str] = None,
-        vertex_ai_search_engine_id: Optional[str] = None,
-        company_registry_path: Optional[str] = None
+        title_keywords: List[str] = None,
     ):
         """Initialize WebScrapingSource with discovery providers.
 
@@ -85,9 +81,8 @@ class WebScrapingSource(BaseJobSource):
                 (default, mid_level, exclude_senior, combined)
             level_terms: Level II terms to search for in mid_level/combined modes
             exclude_terms: Seniority terms to exclude in exclude_senior/combined modes
-            vertex_ai_project_id: LEGACY - no longer used
-            vertex_ai_search_engine_id: LEGACY - no longer used
-            company_registry_path: LEGACY - no longer used
+            title_keywords: Keywords to filter job titles (e.g., ['engineer', 'developer'])
+                Jobs must have at least one keyword in the title to pass
         """
         self.enabled_platforms = enabled_platforms or [
             'greenhouse', 'lever', 'bamboohr', 'ashby'
@@ -98,23 +93,27 @@ class WebScrapingSource(BaseJobSource):
         self.search_mode = search_mode
         self.level_terms = level_terms
         self.exclude_terms = exclude_terms
+        self.title_keywords = title_keywords
 
         # Initialize discovery manager
         self.discovery_manager = self._create_discovery_manager(
             enabled_providers=enabled_discovery_providers or ['greenhouse_api', 'lever_api', 'ashby_api', 'serpapi', 'jobspy'],
-            location_filter=location_filter
+            location_filter=location_filter,
+            title_keywords=title_keywords
         )
 
     def _create_discovery_manager(
         self,
         enabled_providers: List[str],
-        location_filter: Optional[List[str]]
+        location_filter: Optional[List[str]],
+        title_keywords: Optional[List[str]] = None
     ):
         """Create and configure the discovery manager.
 
         Args:
             enabled_providers: List of provider names to enable
             location_filter: Optional location filter
+            title_keywords: Optional title keywords filter
 
         Returns:
             Configured DiscoveryManager instance
@@ -292,6 +291,12 @@ class WebScrapingSource(BaseJobSource):
             from .discovery.filters import create_location_filter
             manager.add_filter(create_location_filter(location_filter))
             logger.info(f"Added location filter: {location_filter}")
+
+        # Add title keywords filter if specified
+        if title_keywords:
+            from .discovery.filters import create_title_keywords_filter
+            manager.add_filter(create_title_keywords_filter(title_keywords))
+            logger.info(f"Added title keywords filter: {title_keywords}")
 
         return manager
 

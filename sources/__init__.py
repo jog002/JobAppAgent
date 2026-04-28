@@ -85,6 +85,7 @@ def get_enabled_sources(config) -> List[BaseJobSource]:
                     search_mode=getattr(config, 'SEARCH_MODE', 'combined'),
                     level_terms=getattr(config, 'LEVEL_TERMS', None),
                     exclude_terms=getattr(config, 'EXCLUDE_LEVELS', None),
+                    title_keywords=getattr(config, 'TITLE_KEYWORDS', None),
                 )
             else:
                 source = get_source(name)
